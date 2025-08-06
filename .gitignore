@@ -1,0 +1,20 @@
+# macOS 관련
+.DS_Store
+
+# Windows 관련
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# 임시 작업
+.cpp
+
+# build
+*.obj
+
+# output
+output
+
+# hard coding
+c_cpp_properties.json
+build.bat
