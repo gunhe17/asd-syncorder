@@ -56,6 +56,8 @@ public:
     
     bool _warmup() override {
         _readSource();
+
+        _setQueue();
         
         return true;
     }
@@ -67,6 +69,12 @@ public:
     bool _stop() override {
         auto device = pipe_.get_active_profile().get_device();
         if (auto recorder = device.as<rs2::recorder>()) recorder.pause();
+
+        for (auto&& sensor : device.query_sensors()) {
+            if (sensor.supports(RS2_OPTION_FRAMES_QUEUE_SIZE)) {
+                float current_size = sensor.get_option(RS2_OPTION_FRAMES_QUEUE_SIZE);
+            }
+        }
 
         pipe_.stop();
 
@@ -97,6 +105,21 @@ private:
         
         if (device_id_ >= static_cast<int>(device_list.size())) {
             throw RealsenseDeviceError("Device index " + std::to_string(device_id_) + " out of range (0-" + std::to_string(device_list.size()-1) + ")");
+        }
+
+        rs2::device device = device_list[device_id_];
+    }
+
+    void _setQueue() {
+        auto device = pipe_.get_active_profile().get_device();
+
+        for (auto&& sensor : device.query_sensors()) {
+            if (sensor.supports(RS2_OPTION_FRAMES_QUEUE_SIZE)) {
+                sensor.set_option(RS2_OPTION_FRAMES_QUEUE_SIZE, 32);
+
+                float new_size = sensor.get_option(RS2_OPTION_FRAMES_QUEUE_SIZE);
+                std::cout << "New Queue Size: " << new_size << std::endl;
+            }
         }
     }
 
