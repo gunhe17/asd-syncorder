@@ -143,22 +143,23 @@ private:
                 TobiiResearchGazeData monotonic_gaze = device_->getGaze();
                 auto monotonic_res = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
 
-                std::cout << std::fixed << std::setprecision(3);
-                std::cout << "monotonic Request:   " << monotonic_req << " ms" << std::endl;
-                std::cout << "monotonic Converted: " << monotonic_gaze.system_time_stamp << " ms" << std::endl;
-                std::cout << "monotonic Response:  " << monotonic_res << " ms" << std::endl;
-                std::cout << "---" << std::endl;
+                std::cout << "[LOG] tobii timestamp monitor" << std::fixed << std::setprecision(3) << "\n"
+                    << "monotonic Request:   " << monotonic_req << " ms" << "\n"
+                    << "monotonic Converted: " << monotonic_gaze.system_time_stamp << " ms" << "\n"
+                    << "monotonic Response:  " << monotonic_res << " ms" << "\n"
+                    << "---" << std::endl;
 
                 // global ts
                 auto global_req = std::chrono::duration<double, std::milli>(std::chrono::system_clock::now().time_since_epoch()).count();
                 TobiiResearchGazeData global_gaze = device_->getGaze();
                 auto global_res = std::chrono::duration<double, std::milli>(std::chrono::system_clock::now().time_since_epoch()).count();
 
-                std::cout << std::fixed << std::setprecision(3);
-                std::cout << "global Request:   " << global_req << " ms" << std::endl;
-                std::cout << "global Converted: " << converter_->get_frame_timestamp(global_gaze.system_time_stamp) << " ms" << std::endl;
-                std::cout << "global Response:  " << global_res << " ms" << std::endl;
-                std::cout << "---" << std::endl;
+                std::cout << "[LOG] tobii timestamp monitor" << std::fixed << std::setprecision(3) << "\n"
+                    << "global Request:   " << global_req << " ms" << "\n"
+                    << "global Converted: " << converter_->get_frame_timestamp(global_gaze.system_time_stamp) << " ms" << "\n"
+                    << "global Response:  " << global_res << " ms" << "\n"
+                    << "---" << std::endl;
+
             }
         });
     }

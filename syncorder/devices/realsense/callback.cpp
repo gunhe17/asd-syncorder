@@ -43,8 +43,6 @@ public:
                 return false;
             }
         }
-        
-        std::cout << "[RealSense] warmup clear\n";
 
         return true;
     }
@@ -62,5 +60,7 @@ private:
 
         // buffer
         // *.bag를 사용하는 이유로 생략
+
+        std::cout << "LOG|REALSENSE|FRAME|SUCCESS" << "\n";
     }
 };

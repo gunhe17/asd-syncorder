@@ -113,11 +113,11 @@ private:
 
                 pipe.stop();
 
-                std::cout << std::fixed << std::setprecision(3);
-                std::cout << "global Request:   " << global_req << " ms" << std::endl;
-                std::cout << "global Converted: " << frame.get_timestamp() << " ms" << std::endl;
-                std::cout << "global Response:  " << global_res << " ms" << std::endl;
-                std::cout << "---" << std::endl;
+                std::cout << "[LOG] realsense timestamp monitor" << std::fixed << std::setprecision(3) << "\n"
+                    << "global Request:   " << global_req << " ms" << "\n"
+                    << "global Converted: " << frame.get_timestamp() << " ms" << "\n"
+                    << "global Response:  " << global_res << " ms" << "\n"
+                    << "---" << std::endl;
             }
         });
     }

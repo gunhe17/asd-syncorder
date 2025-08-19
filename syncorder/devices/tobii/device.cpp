@@ -80,6 +80,11 @@ public:
     }
     
     bool _stop() override {
+        TobiiResearchStatus status = tobii_research_unsubscribe_from_gaze_data(
+            device_, 
+            reinterpret_cast<void(*)(TobiiResearchGazeData*, void*)>(gaze_)
+        );
+
         return true;
     }
     
@@ -156,7 +161,7 @@ private:
         
         if (size == 0) { 
             fclose(f); 
-            std::cout << "Warning: Calibration file is empty, skipping\n";
+            std::cout << "[Warning] Calibration file is empty, skipping\n";
             return;
         }
 

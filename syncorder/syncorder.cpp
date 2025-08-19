@@ -25,16 +25,13 @@ private:
 public:
     void addDevice(std::unique_ptr<BManager> manager) {
         if (!manager) {
-            std::cout << "[syncorder] Warning: null manager ignored\n";
+            std::cout << "[Warning] null manager ignored\n";
             return;
         }
-        
-        std::cout << "[syncorder] Added manager: " << manager->__name__() << "\n";
         managers_.push_back(std::move(manager));
     }
     
     bool executeSetup() {
-        std::cout << "[syncorder] Coordinating setup phase...\n";
         bool result = executeStage("setup", [](BManager& manager) {
             manager.setup();
             return manager.__is_setup__();
@@ -45,7 +42,6 @@ public:
     }
     
     bool executeWarmup() {
-        std::cout << "[syncorder] Coordinating warmup phase...\n";
         bool result = executeStage("warmup", [](BManager& manager) {
             manager.warmup();
             return manager.__is_warmup__();
@@ -56,7 +52,6 @@ public:
     }
     
     bool executeStart() {
-        std::cout << "[syncorder] Coordinating start phase...\n";
         bool result = executeStage("start", [](BManager& manager) {
             manager.start();
             return manager.__is_running__();
@@ -67,7 +62,6 @@ public:
     }
     
     void executeStop() {
-        std::cout << "[syncorder] Coordinating stop phase...\n";
         std::vector<std::future<void>> futures;
         
         for (auto& manager : managers_) {
@@ -89,7 +83,6 @@ public:
     }
     
     void executeCleanup() {
-        std::cout << "[syncorder] Coordinating cleanup phase...\n";
         for (auto& manager : managers_) {
             try {
                 manager->cleanup();
@@ -103,14 +96,12 @@ public:
     }
     
     void abort() {
-        std::cout << "[syncorder] Abort requested\n";
         abort_flag_.store(true);
         executeStop();
     }
     
     void setTimeout(std::chrono::milliseconds timeout) {
         default_timeout_ = timeout;
-        std::cout << "[syncorder] Timeout set to " << timeout.count() << "ms\n";
     }
     
     size_t getDeviceCount() const {

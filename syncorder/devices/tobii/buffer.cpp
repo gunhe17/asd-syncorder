@@ -32,6 +32,6 @@ public:
     }
 protected:
     void onOverflow() noexcept override {
-        std::cout << "[TobiiBuffer Warning] Buffer overflow\n";
+        std::cout << "[Warning] Buffer overflow\n";
     }
 };
