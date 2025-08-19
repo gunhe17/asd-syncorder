@@ -40,7 +40,12 @@ public:
     ~RealsenseBroker() {}
 
 public:
-    void cleanup() {}
+    void cleanup() {
+        while (buffer_ && static_cast<RealsenseBuffer*>(buffer_)->size() > 0) {
+            _broker();
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+    }
 
 protected:
     void _process(const RealsenseBufferData& data) override {}

@@ -21,6 +21,7 @@ class RealsenseDevice : public BDevice {
 private:
     rs2::pipeline pipe_;
     rs2::config config_;
+    std::shared_ptr<rs2::context> ctx_;
     
     void* callback_;
 
@@ -48,6 +49,7 @@ public:
     }
     
     bool _setup() override {
+        _createContext();
         _createConfig();
         _validateDevice();
         
@@ -68,15 +70,17 @@ public:
     
     bool _stop() override {
         auto device = pipe_.get_active_profile().get_device();
-        if (auto recorder = device.as<rs2::recorder>()) recorder.pause();
-
-        for (auto&& sensor : device.query_sensors()) {
-            if (sensor.supports(RS2_OPTION_FRAMES_QUEUE_SIZE)) {
-                float current_size = sensor.get_option(RS2_OPTION_FRAMES_QUEUE_SIZE);
-            }
+        
+        if (auto recorder = device.as<rs2::recorder>()) {
+            recorder.pause();
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
 
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
         pipe_.stop();
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
         return true;
     }
@@ -87,6 +91,10 @@ public:
     }
 
 private:
+    void _createContext() {
+        ctx_ = std::make_shared<rs2::context>();
+    }
+
     void _createConfig() {
         config_.enable_stream(RS2_STREAM_COLOR, 640, 480, RS2_FORMAT_RGB8, 60);
         config_.enable_stream(RS2_STREAM_DEPTH, 640, 480, RS2_FORMAT_Z16, 60);
@@ -96,8 +104,7 @@ private:
     }
     
     void _validateDevice() {
-        rs2::context ctx;
-        auto device_list = ctx.query_devices();
+        auto device_list = ctx_->query_devices();
         
         if (device_list.size() == 0) {
             throw RealsenseDeviceError("No RealSense devices found");
@@ -129,6 +136,8 @@ private:
         }
         
         auto func = reinterpret_cast<void(*)(const rs2::frame&)>(callback_);
+        
+        pipe_ = rs2::pipeline(*ctx_);
         pipe_.start(config_, func);
     }
 };
