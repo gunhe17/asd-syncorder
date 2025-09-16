@@ -4,7 +4,8 @@
 #include <syncorder/devices/realsense/device.cpp>
 #include <syncorder/devices/realsense/callback.cpp>
 #include <syncorder/devices/realsense/buffer.cpp>
-#include <syncorder/devices/realsense/broker.cpp>
+#include <syncorder/devices\realsense\broker.cpp>
+#include <syncorder/monitoring/realsense_monitor.h>
 
 
 /**
@@ -23,6 +24,7 @@ private:
     // monitor
     std::thread mt_thread_;
     std::atomic<bool> monitor_in_progress_{false};
+    std::unique_ptr<RealsenseMonitor> realsense_monitor_;
 public:
     explicit RealsenseManager(int device_id)
     : 
@@ -31,6 +33,7 @@ public:
             callback_ = std::make_unique<RealsenseCallback>();
             buffer_ = std::make_unique<RealsenseBuffer>();
             broker_ = std::make_unique<RealsenseBroker>();
+            realsense_monitor_ = std::make_unique<RealsenseMonitor>();
         }
 
 public:
@@ -40,7 +43,7 @@ public:
         device_->setup();
 
         // callback
-        callback_->setup(static_cast<void*>(buffer_.get()));
+        callback_->setup(static_cast<void*>(buffer_.get()), static_cast<void*>(realsense_monitor_.get()));
 
         // broker
         broker_->setup(buffer_.get(), reinterpret_cast<void*>(&RealsenseBuffer::dequeue));
@@ -53,9 +56,12 @@ public:
     }
     
     bool warmup() override {
+        // Start realsense monitor
+        realsense_monitor_->start();
+
         device_->warmup();
         callback_->warmup();
-        
+
         // monitor
         monitor_in_progress_.store(true);
         // _monitor(); // *optional
@@ -70,6 +76,9 @@ public:
         // buffer_->start(); *buffer not used.
         broker_->start();
 
+        // Notify monitor that recording has started
+        realsense_monitor_->onRecordingStart();
+
         // flag
         is_running_.store(true);
 
@@ -77,21 +86,59 @@ public:
     }
 
     bool stop() override {
-        // broker_->stop();
-        // buffer_->stop(); *buffer not used.
-        device_->stop();
+        bool success = true;
 
-        // monitor
-        monitor_in_progress_.store(false);
+        try {
+            // Notify monitor that recording is stopping
+            realsense_monitor_->onRecordingStop();
 
-        return true;
+            // Stop components in reverse order of initialization
+            realsense_monitor_->stop();
+
+            if (!device_->stop()) {
+                success = false;
+            }
+
+            // Note: broker and buffer are not used
+            // broker_->stop();
+            // buffer_->stop(); *buffer not used.
+
+            // Stop internal monitoring
+            monitor_in_progress_.store(false);
+            if (mt_thread_.joinable()) {
+                mt_thread_.join();
+            }
+
+        } catch (const std::exception&) {
+            success = false;
+
+            // Try to force stop the monitor even if other components failed
+            try {
+                realsense_monitor_->stop();
+            } catch (const std::exception&) {
+                // Monitor stop failed during error recovery
+            }
+        }
+
+        return success;
     }
 
     bool cleanup() override {
-        broker_->cleanup();
-        device_->cleanup();
+        bool success = true;
 
-        return true;
+        try {
+            // Cleanup components in reverse order
+            if (!device_->cleanup()) {
+                success = false;
+            }
+
+            broker_->cleanup();
+
+        } catch (const std::exception&) {
+            success = false;
+        }
+
+        return success;
     }
 
     std::string __name__() const override {

@@ -4,7 +4,8 @@
       "Bash(dir:*)",
       "Bash(.scriptsopsbuild.bat)",
       "Bash(./scripts/ops/build.bat)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(powershell:*)"
     ],
     "deny": [],
     "ask": []

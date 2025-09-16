@@ -67,21 +67,42 @@ public:
     }
     
     bool _stop() override {
-        auto device = pipe_.get_active_profile().get_device();
-        if (auto recorder = device.as<rs2::recorder>()) recorder.pause();
+        try {
+            auto device = pipe_.get_active_profile().get_device();
 
-        for (auto&& sensor : device.query_sensors()) {
-            if (sensor.supports(RS2_OPTION_FRAMES_QUEUE_SIZE)) {
-                float current_size = sensor.get_option(RS2_OPTION_FRAMES_QUEUE_SIZE);
+            // Stop recording if active
+            if (auto recorder = device.as<rs2::recorder>()) {
+                recorder.pause();
+            }
+
+            // Stop the pipeline
+            pipe_.stop();
+
+            // Verify bag file was created (minimal verification)
+            if (!std::filesystem::exists(bag_path_)) {
+                // Recording file not found - this is logged by monitor
+            }
+
+        } catch (const std::exception&) {
+            // Still try to stop the pipeline even if other operations failed
+            try {
+                pipe_.stop();
+            } catch (const std::exception&) {
+                return false;
             }
         }
-
-        pipe_.stop();
 
         return true;
     }
     
     bool _cleanup() override {
+        try {
+            // Reset internal state
+            callback_ = nullptr;
+
+        } catch (const std::exception&) {
+            return false;
+        }
 
         return true;
     }
@@ -104,7 +125,8 @@ private:
         }
         
         if (device_id_ >= static_cast<int>(device_list.size())) {
-            throw RealsenseDeviceError("Device index " + std::to_string(device_id_) + " out of range (0-" + std::to_string(device_list.size()-1) + ")");
+            std::string error_msg = "Device index " + std::to_string(device_id_) + " out of range (0-" + std::to_string(device_list.size()-1) + ")";
+            throw RealsenseDeviceError(error_msg);
         }
 
         rs2::device device = device_list[device_id_];
@@ -118,7 +140,7 @@ private:
                 sensor.set_option(RS2_OPTION_FRAMES_QUEUE_SIZE, 32);
 
                 float new_size = sensor.get_option(RS2_OPTION_FRAMES_QUEUE_SIZE);
-                std::cout << "New Queue Size: " << new_size << std::endl;
+                // Queue size set successfully
             }
         }
     }

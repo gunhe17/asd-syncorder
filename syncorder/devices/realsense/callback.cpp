@@ -6,6 +6,7 @@
 // local
 #include <syncorder/devices/realsense/buffer.cpp> //TODO: include buffer
 #include <syncorder/error/exception.h>
+#include <syncorder/monitoring/realsense_monitor.h>
 
 
 /**
@@ -16,6 +17,7 @@ class RealsenseCallback {
 private:
     static inline RealsenseCallback* instance_ = nullptr;
     void* buffer_;
+    void* monitor_;
 
     // flag
     std::atomic<bool> first_frame_received_;
@@ -25,9 +27,10 @@ public:
     ~RealsenseCallback() {}
 
 public:
-    void setup(void* buffer) {
+    void setup(void* buffer, void* monitor = nullptr) {
         instance_ = this;
         buffer_ = buffer;
+        monitor_ = monitor;
 
         first_frame_received_.store(false);
     }
@@ -39,7 +42,10 @@ public:
         while (!first_frame_received_.load()) {
             auto elapsed = std::chrono::steady_clock::now() - start;
             if (elapsed >= end) {
-                std::cout << "[ERROR] warmup timeout\n";
+                if (monitor_) {
+                    auto* realsense_monitor = static_cast<RealsenseMonitor*>(monitor_);
+                    realsense_monitor->onError("Warmup timeout - no frames received within 10 seconds");
+                }
                 return false;
             }
         }
@@ -55,12 +61,49 @@ public:
 
 private:
     void _onFrameset(const rs2::frame& frame) {
-        // flag
-        if (!first_frame_received_.load()) first_frame_received_.store(true);
+        try {
+            // flag
+            if (!first_frame_received_.load()) {
+                first_frame_received_.store(true);
+                if (monitor_) {
+                    auto* realsense_monitor = static_cast<RealsenseMonitor*>(monitor_);
+                    realsense_monitor->onDeviceEvent("FIRST_FRAME_RECEIVED", "First frame received successfully");
+                }
+            }
 
-        // buffer
-        // *.bag를 사용하는 이유로 생략
+            // Monitor frame event
+            if (monitor_) {
+                try {
+                    auto current_time = std::chrono::duration<double, std::milli>(
+                        std::chrono::system_clock::now().time_since_epoch()).count();
 
-        std::cout << "LOG|REALSENSE|FRAME|SUCCESS" << "\n";
+                    auto frame_timestamp = frame.get_timestamp();
+                    auto latency = current_time - frame_timestamp;
+
+                    auto* realsense_monitor = static_cast<RealsenseMonitor*>(monitor_);
+                    realsense_monitor->onFrameReceived(frame_timestamp, latency);
+
+                } catch (const std::exception& e) {
+                    if (monitor_) {
+                        auto* realsense_monitor = static_cast<RealsenseMonitor*>(monitor_);
+                        realsense_monitor->onError("Frame monitoring error: " + std::string(e.what()));
+                    }
+                }
+            }
+
+            // buffer
+            // *.bag를 사용하는 이유로 생략
+
+        } catch (const std::exception& e) {
+            // Report to monitor if available
+            if (monitor_) {
+                try {
+                    auto* realsense_monitor = static_cast<RealsenseMonitor*>(monitor_);
+                    realsense_monitor->onError("Critical frame error: " + std::string(e.what()));
+                } catch (...) {
+                    // Even monitor reporting failed - no fallback needed as monitor handles its own errors
+                }
+            }
+        }
     }
 };

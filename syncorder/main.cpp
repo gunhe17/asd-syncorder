@@ -15,11 +15,13 @@
 #include <syncorder/devices/realsense/device.cpp>
 #include <syncorder/devices/realsense/manager.cpp>
 #include <syncorder/monitoring/cpu_monitor.h>
+#include <syncorder/monitoring/realsense_monitor.h>
 
 // shut down
 std::atomic<bool> should_exit{false};
 
 void signal_handler(int signal) {
+    std::cout << "\n[INFO] Signal " << signal << " received. Initiating graceful shutdown...\n";
     should_exit = true;
 }
 
@@ -73,9 +75,15 @@ int main(int argc, char* argv[]) {
             std::this_thread::sleep_for(std::chrono::seconds(1));
         }
 
-        if (should_exit) {}
+        if (should_exit) {
+            std::cout << "\n[INFO] Early termination requested. Stopping recording...\n";
+        } else {
+            std::cout << "\n[INFO] Recording duration completed. Stopping recording...\n";
+        }
 
+        std::cout << "[INFO] Executing stop sequence...\n";
         syncorder.executeStop();
+        std::cout << "[INFO] Executing cleanup sequence...\n";
         syncorder.executeCleanup();
 
 
