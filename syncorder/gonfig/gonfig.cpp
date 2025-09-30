@@ -9,16 +9,16 @@ Config gonfig;
 
 Config Config::parseArgs(int argc, char* argv[]) {
     Config conf;
-    
+
     for (int i = 1; i < argc; i++) {
         std::string arg = argv[i];
-        
+
         if (false) {
             // ...
         }
         else if (arg == "--output_path" && i + 1 < argc) {
             conf.output_path = argv[++i];
-        } 
+        }
         else if (arg == "--calibration_path" && i + 1 < argc) {
             conf.calibration_path = argv[++i];
         }
@@ -26,6 +26,6 @@ Config Config::parseArgs(int argc, char* argv[]) {
             conf.record_duration = std::stoi(argv[++i]);
         }
     }
-    
+
     return conf;
 }

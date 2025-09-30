@@ -62,8 +62,6 @@ private:
         auto* tobii_buffer = static_cast<TobiiBuffer*>(buffer_);
         TobiiBufferData data = _map(gaze_data);
         tobii_buffer->enqueue(std::move(data));
-
-        std::cout << "LOG|TOBII|FRAME|SUCCESS" << "\n";
     }
 
 private:

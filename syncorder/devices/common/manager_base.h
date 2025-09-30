@@ -17,6 +17,7 @@ public:
     virtual bool start() = 0;
     virtual bool stop() = 0;
     virtual bool cleanup() = 0;
+    virtual bool verify(std::map<std::string, std::vector<std::string>> files) = 0;
 
     virtual std::string __name__() const = 0;
 

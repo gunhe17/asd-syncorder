@@ -1,6 +1,9 @@
 #include <chrono>
 #include <inttypes.h>
 #include <cstdio>
+#include <filesystem>
+#include <fstream>
+#include <map>
 
 // local
 #include <syncorder/error/exception.h>
@@ -115,11 +118,66 @@ public:
         return true;
     }
 
+    bool verify(std::map<std::string, std::vector<std::string>> files) override {
+        auto& csv_files = files["tobii_csvs"];
+        std::cout << "[Tobii] Starting verification of " << csv_files.size() << " CSV files\n";
+
+        int valid_files = 0;
+        for (const auto& csv_path : csv_files) {
+            if (_verify(csv_path)) {
+                valid_files++;
+            }
+        }
+
+        bool result = (valid_files == csv_files.size());
+        std::cout << "[Tobii] Summary: " << valid_files << "/" << csv_files.size() << " files valid\n";
+        std::cout << "[Tobii] Verify phase " << (result ? "completed" : "failed") << "\n";
+        return result;
+    }
+
     std::string __name__() const override {
         return "Tobii";
     }
 
 private:
+    bool _verify(const std::string& csv_path) {
+        std::cout << "[Tobii] Verifying file: " << csv_path << "\n";
+
+        if (!std::filesystem::exists(csv_path)) {
+            std::cout << "[Tobii] File does not exist\n";
+            return false;
+        }
+
+        auto file_size = std::filesystem::file_size(csv_path);
+        std::cout << "[Tobii] File size: " << file_size << " bytes\n";
+
+        if (file_size == 0) {
+            std::cout << "[Tobii] File is empty\n";
+            return false;
+        }
+
+        try {
+            std::ifstream file(csv_path);
+            std::string first_line;
+            if (std::getline(file, first_line)) {
+                std::cout << "[Tobii] First line: " << first_line << "\n";
+                if (first_line.find("index,") == 0) {
+                    std::cout << "[Tobii] File verification successful\n";
+                    return true;
+                } else {
+                    std::cout << "[Tobii] Invalid CSV header format\n";
+                    return false;
+                }
+            } else {
+                std::cout << "[Tobii] Could not read first line\n";
+                return false;
+            }
+        } catch (const std::exception& e) {
+            std::cout << "[Tobii] File verification failed: " << e.what() << "\n";
+            return false;
+        }
+    }
+
     void _calibrate() {
         cb_thread_ = std::thread([this]() {
             while (calibrate_in_progress_.load()) {

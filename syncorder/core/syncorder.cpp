@@ -9,8 +9,14 @@
 #include <future>
 #include <functional>
 #include <string>
+#include <map>
+#include <filesystem>
 
+// local
 #include <syncorder/devices/common/manager_base.h>
+#include <syncorder/gonfig/gonfig.h>
+#include <syncorder/error/exception.h>
+
 
 /**
  * @class
@@ -93,6 +99,22 @@ public:
         }
 
         std::cout << "[syncorder] Cleanup phase completed\n";
+    }
+
+    bool executeVerify() {
+        auto files = _scan();
+        std::cout << "[syncorder] Found " << files["realsense_bags"].size() << " .bag files and " << files["tobii_csvs"].size() << " .csv files\n";
+
+        for (auto& manager : managers_) {
+            try{
+                manager->verify(files);
+            } catch (const std::exception& e) {
+                std::cout << "[" << manager->__name__() << "] Verify error: " << e.what() << "\n";
+            }
+        }
+
+        std::cout << "[syncorder] Verify phase completed\n";
+        return true;
     }
     
     void abort() {
@@ -190,5 +212,26 @@ private:
         }
         
         return all_success;
+    }
+
+    std::map<std::string, std::vector<std::string>> _scan() {
+        std::map<std::string, std::vector<std::string>> files{
+            {"realsense_bags", {}},
+            {"tobii_csvs", {}}
+        };
+        try {
+            for (const auto& f : std::filesystem::recursive_directory_iterator(gonfig.output_path)) {
+                if (f.is_regular_file()) {
+                    auto ext = f.path().extension();
+                    // Use generic_string() for consistent forward slash paths
+                    auto path_str = f.path().generic_string();
+                    if (ext == ".bag") files["realsense_bags"].push_back(path_str);
+                    else if (ext == ".csv") files["tobii_csvs"].push_back(path_str);
+                }
+            }
+        } catch (const std::exception& e) {
+            std::cout << "[syncorder] Scan error: " << e.what() << "\n";
+        }
+        return files;
     }
 };

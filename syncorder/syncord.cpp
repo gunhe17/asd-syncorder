@@ -10,7 +10,7 @@
 // local
 #include <syncorder/gonfig/gonfig.h>
 #include <syncorder/error/exception.h>
-#include <syncorder/syncorder.cpp>
+#include <syncorder/core/syncorder.cpp>
 #include <syncorder/devices/tobii/device.cpp>
 #include <syncorder/devices/tobii/manager.cpp>
 #include <syncorder/devices/realsense/device.cpp>
