@@ -53,7 +53,7 @@ int main(int argc, char* argv[]) {
         /**
          * ::Initalize
          */
-        CpuMonitor cpu_monitor;
+        CpuRamMonitor cpu_monitor;
         cpu_monitor.start();
 
         Syncorder syncorder;
