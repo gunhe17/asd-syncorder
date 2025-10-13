@@ -130,8 +130,11 @@ public:
         }
 
         bool result = (valid_files == csv_files.size());
+        _verified(result);
+
         std::cout << "[Tobii] Summary: " << valid_files << "/" << csv_files.size() << " files valid\n";
         std::cout << "[Tobii] Verify phase " << (result ? "completed" : "failed") << "\n";
+
         return result;
     }
 
@@ -176,6 +179,26 @@ private:
             std::cout << "[Tobii] File verification failed: " << e.what() << "\n";
             return false;
         }
+    }
+
+    void _verified(bool result) {
+        if (!std::filesystem::exists(gonfig.verified_path)) {
+            std::filesystem::create_directories(gonfig.verified_path);
+        }
+
+        std::string csv_path = gonfig.verified_path + "tobii_verify_result.csv";
+        std::ofstream csv(csv_path);
+
+        if (!csv.is_open()) {
+            std::cout << "[Tobii] Failed to create result CSV file: " << csv_path << "\n";
+            return;
+        }
+
+        csv << "valid\n";
+        csv << result;
+
+        csv.close();
+        std::cout << "[Tobii] Results written to " << csv_path << "\n";
     }
 
     void _calibrate() {

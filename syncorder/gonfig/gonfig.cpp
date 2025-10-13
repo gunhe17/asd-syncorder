@@ -19,6 +19,9 @@ Config Config::parseArgs(int argc, char* argv[]) {
         else if (arg == "--output_path" && i + 1 < argc) {
             conf.output_path = argv[++i];
         }
+        else if (arg == "--verified_path" && i + 1 < argc) {
+            conf.verified_path = argv[++i];
+        }
         else if (arg == "--calibration_path" && i + 1 < argc) {
             conf.calibration_path = argv[++i];
         }

@@ -39,23 +39,19 @@ int main(int argc, char* argv[]) {
 
     // gonfig
     gonfig = Config::parseArgs(argc, argv);
-    
+
+    gonfig.output_path = "C:/Users/insighter/AppData/Local/Temp/syncorder";
+
     // Set up
     char tempPath[MAX_PATH];
     GetTempPathA(MAX_PATH, tempPath);
-    std::string output_path = std::string(tempPath) + "syncorder\\";
+    gonfig.output_path = std::string(tempPath) + "syncorder\\";
     
     // Clean up
-    if (GetFileAttributesA(output_path.c_str()) != INVALID_FILE_ATTRIBUTES) {
-        std::string cleanup_cmd = "rmdir /s /q \"" + output_path + "\" 2>nul";
+    if (GetFileAttributesA(gonfig.output_path.c_str()) != INVALID_FILE_ATTRIBUTES) {
+        std::string cleanup_cmd = "rmdir /s /q \"" + gonfig.output_path + "\" 2>nul";
         system(cleanup_cmd.c_str());
     }
-    
-    gonfig.output_path = output_path;
-    std::cout << "[INFO] Using temp directory: " << gonfig.output_path << "\n";
-    
-    gonfig.record_duration = 5;
-    std::cout << "[INFO] test 5s: " << gonfig.record_duration << "\n";
 
     try {
         Syncorder syncorder;
@@ -70,18 +66,18 @@ int main(int argc, char* argv[]) {
         /**
          * ::Setup()
          */
-        if (!syncorder.executeSetup()) return -1;
+        if (!syncorder.executeSetup()) return 1;
 
         /**
          * ::Warmup()
          */
-        if (!syncorder.executeWarmup()) return -1;
+        if (!syncorder.executeWarmup()) return 1;
         std::this_thread::sleep_for(std::chrono::seconds(3));
 
         /**
          * ::Start()
          */
-        if (!syncorder.executeStart()) return -1;
+        if (!syncorder.executeStart()) return 1;
         
         /**
          * ::Stop()
@@ -116,14 +112,16 @@ int main(int argc, char* argv[]) {
         std::cout << "[INFO] Starting verify phase...\n";
         if(!syncorder.executeVerify()) {
             std::cout << "[ERROR] Verify failed\n";
-            return -1;
+            return 1;
         }
         std::cout << "[INFO] Verify completed successfully\n";
+        
+        return 0;
 
     } catch (const std::exception& e) {
         std::cout << "[ERROR] Main.cpp error: " << e.what() << "\n";
         if (stopEvent) CloseHandle(stopEvent);
-        return -1;
+        return 1;
     }
 
     // Cleanup
