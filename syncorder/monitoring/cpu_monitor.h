@@ -82,7 +82,7 @@ public:
         }
 
         // Write CSV header
-        log_file_ << "Time,CPU(%),RAM_Used(MB),RAM_Total(MB),RAM(%)\n";
+        log_file_ << "Date,Time,CPU(%),RAM(%)\n";
 
         // Start monitoring thread
         running_ = true;
@@ -153,12 +153,11 @@ private:
             ULONGLONG ram_total_mb = mem_status.ullTotalPhys / (1024 * 1024);
 
             if (log_file_.is_open()) {
-                // Write readable timestamp instead of epoch time
-                log_file_ << std::put_time(local_time, "%Y-%m-%d %H:%M:%S") << ","
+                // Write date, time, CPU%, RAM% (both with 1 decimal place)
+                log_file_ << std::put_time(local_time, "%Y-%m-%d") << ","
+                         << std::put_time(local_time, "%H:%M:%S") << ","
                          << std::fixed << std::setprecision(1) << cpu_value.doubleValue << ","
-                         << ram_used_mb << ","
-                         << ram_total_mb << ","
-                         << mem_status.dwMemoryLoad << "\n";
+                         << std::fixed << std::setprecision(1) << static_cast<double>(mem_status.dwMemoryLoad) << "\n";
                 log_file_.flush();
 
                 // Also log to console occasionally

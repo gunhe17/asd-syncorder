@@ -31,7 +31,5 @@ public:
         return new TobiiBufferData(std::move(result.value()));
     }
 protected:
-    void onOverflow() noexcept override {
-        std::cout << "[Warning] Buffer overflow\n";
-    }
+    void onOverflow() noexcept override { std::cout << "[Warning] Buffer overflow\n"; }
 };

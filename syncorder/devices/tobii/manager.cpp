@@ -112,8 +112,13 @@ public:
     }
 
     bool cleanup() override {
-        broker_->cleanup();
         device_->cleanup();
+        broker_->cleanup();
+
+        device_.reset();
+        callback_.reset();
+        buffer_.reset();
+        broker_.reset();
 
         return true;
     }

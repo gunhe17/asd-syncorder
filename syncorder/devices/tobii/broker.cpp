@@ -88,7 +88,6 @@ private:
     // for csv
     size_t index_ = 0;
 
-
 public:
     TobiiBroker() {
         output_ = gonfig.output_path + "tobii/";

@@ -91,8 +91,27 @@ private:
                 }
             }
 
-            // buffer
-            // *.bag를 사용하는 이유로 생략
+            // buffer - enqueue frame data
+            if (buffer_) {
+                try {
+                    // Check if this is a frameset
+                    if (auto fs = frame.as<rs2::frameset>()) {
+                        auto color = fs.get_color_frame();
+                        auto depth = fs.get_depth_frame();
+
+                        if (color && depth) {
+                            auto* realsense_buffer = static_cast<RealsenseBuffer*>(buffer_);
+                            RealsenseBufferData data(color, depth);
+                            realsense_buffer->enqueue(std::move(data));
+                        }
+                    }
+                } catch (const std::exception& e) {
+                    if (monitor_) {
+                        auto* realsense_monitor = static_cast<RealsenseMonitor*>(monitor_);
+                        realsense_monitor->onError("Buffer enqueue error: " + std::string(e.what()));
+                    }
+                }
+            }
 
         } catch (const std::exception& e) {
             // Report to monitor if available

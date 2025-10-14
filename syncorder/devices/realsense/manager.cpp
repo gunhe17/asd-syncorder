@@ -32,6 +32,7 @@ private:
     std::thread mt_thread_;
     std::atomic<bool> monitor_in_progress_{false};
     std::unique_ptr<RealsenseMonitor> realsense_monitor_;
+
 public:
     explicit RealsenseManager(int device_id)
     : 
@@ -40,6 +41,7 @@ public:
             callback_ = std::make_unique<RealsenseCallback>();
             buffer_ = std::make_unique<RealsenseBuffer>();
             broker_ = std::make_unique<RealsenseBroker>();
+
             realsense_monitor_ = std::make_unique<RealsenseMonitor>();
         }
 
@@ -80,14 +82,14 @@ public:
     }
     
     bool start() override {
-        // buffer_->start(); *buffer not used.
         broker_->start();
-
-        // Notify monitor that recording has started
-        realsense_monitor_->onRecordingStart();
+        buffer_->start();
 
         // flag
         is_running_.store(true);
+
+        // monitor
+        realsense_monitor_->onRecordingStart();
 
         return true;
     }
@@ -96,34 +98,31 @@ public:
         bool success = true;
 
         try {
-            // Notify monitor that recording is stopping
             realsense_monitor_->onRecordingStop();
 
-            // Stop components in reverse order of initialization
-            realsense_monitor_->stop();
+            // Stop broker and buffer first to close gate
+            broker_->stop();
+            buffer_->stop();
 
+            // Then stop device
             if (!device_->stop()) {
                 success = false;
             }
 
-            // Note: broker and buffer are not used
-            // broker_->stop();
-            // buffer_->stop(); *buffer not used.
+            realsense_monitor_->stop();
 
-            // Stop internal monitoring
             monitor_in_progress_.store(false);
             if (mt_thread_.joinable()) {
                 mt_thread_.join();
             }
-            
+
         } catch (const std::exception&) {
             success = false;
 
-            // Try to force stop the monitor even if other components failed
             try {
                 realsense_monitor_->stop();
             } catch (const std::exception&) {
-                // Monitor stop failed during error recovery
+
             }
         }
 
@@ -131,27 +130,17 @@ public:
     }
 
     bool cleanup() override {
-        bool success = true;
+        device_->cleanup();
+        broker_->cleanup();
 
-        try {
-            // Cleanup components in reverse order
-            if (!device_->cleanup()) {
-                success = false;
-            }
+        device_.reset();
+        callback_.reset();
+        buffer_.reset();
+        broker_.reset();
 
-            broker_->cleanup();
+        realsense_monitor_.reset();
 
-            device_.reset();
-            callback_.reset();
-            buffer_.reset();
-            broker_.reset();
-            realsense_monitor_.reset();
-            
-        } catch (const std::exception&) {
-            success = false;
-        }
-
-        return success;
+        return true;
     }
 
     bool verify(std::map<std::string, std::vector<std::string>> files) override {
@@ -174,7 +163,6 @@ public:
         return result;
     }
 
-private:
     std::string __name__() const override {
         return "Realsense";
     }
