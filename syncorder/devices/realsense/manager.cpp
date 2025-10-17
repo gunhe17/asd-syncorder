@@ -144,20 +144,35 @@ public:
     }
 
     bool verify(std::map<std::string, std::vector<std::string>> files) override {
+        auto& csv_files = files["realsense_csvs"];
         auto& bag_files = files["realsense_bags"];
-        std::cout << "[Realsense] Starting verification of " << bag_files.size() << " bag files\n";
 
-        int valid_files = 0;
-        for (const auto& bag_path : bag_files) {
-            if (_verify(bag_path)) {
-                valid_files++;
+        std::cout << "[Realsense] Starting verification of " << csv_files.size() << " CSV files and " << bag_files.size() << " bag files\n";
+
+        // Verify CSV files
+        int valid_csv_files = 0;
+        for (const auto& csv_path : csv_files) {
+            if (_verify_csv(csv_path)) {
+                valid_csv_files++;
             }
         }
 
-        bool result = (valid_files == bag_files.size());
+        // Verify BAG files
+        int valid_bag_files = 0;
+        for (const auto& bag_path : bag_files) {
+            if (_verify_bag(bag_path)) {
+                valid_bag_files++;
+            }
+        }
+
+        bool csv_result = (valid_csv_files == csv_files.size());
+        bool bag_result = (valid_bag_files == bag_files.size());
+        bool result = csv_result && bag_result;
+
         _verified(result);
 
-        std::cout << "[Realsense] Summary: " << valid_files << "/" << bag_files.size() << " files valid\n";
+        std::cout << "[Realsense] Summary: " << valid_csv_files << "/" << csv_files.size() << " CSV files valid, "
+                  << valid_bag_files << "/" << bag_files.size() << " bag files valid\n";
         std::cout << "[Realsense] Verify phase " << (result ? "completed" : "failed") << "\n";
 
         return result;
@@ -168,7 +183,75 @@ public:
     }
 
 private:
-    bool _verify(const std::string& bag_path) {
+    bool _verify_csv(const std::string& csv_path) {
+        std::cout << "[Realsense] Verifying CSV file: " << csv_path << "\n";
+
+        if (!std::filesystem::exists(csv_path)) {
+            std::cout << "[Realsense] File does not exist\n";
+            return false;
+        }
+
+        auto file_size = std::filesystem::file_size(csv_path);
+        std::cout << "[Realsense] File size: " << file_size << " bytes\n";
+
+        if (file_size == 0) {
+            std::cout << "[Realsense] File is empty\n";
+            return false;
+        }
+
+        try {
+            std::ifstream file(csv_path);
+            std::string line;
+            int line_count = 0;
+            bool header_valid = false;
+
+            // Read and verify header
+            if (std::getline(file, line)) {
+                line_count++;
+                std::cout << "[Realsense] First line: " << line << "\n";
+                if (line.find("index,") == 0) {
+                    header_valid = true;
+                } else {
+                    std::cout << "[Realsense] Invalid CSV header format\n";
+                    return false;
+                }
+            } else {
+                std::cout << "[Realsense] Could not read first line\n";
+                return false;
+            }
+
+            // Count data rows (excluding header)
+            while (std::getline(file, line)) {
+                if (!line.empty()) {
+                    line_count++;
+                }
+            }
+
+            int data_row_count = line_count - 1; // Exclude header
+            int expected_frames = gonfig.record_duration * 60; // 60 fps
+
+            std::cout << "[Realsense] Data rows: " << data_row_count << "\n";
+            std::cout << "[Realsense] Expected frames (60fps * " << gonfig.record_duration << "s): " << expected_frames << "\n";
+
+            if (data_row_count < expected_frames) {
+                std::cout << "[Realsense] Insufficient frames (expected: >=" << expected_frames << ", actual: " << data_row_count << ")\n";
+                return false;
+            }
+
+            if (data_row_count > expected_frames) {
+                std::cout << "[Realsense] Extra frames recorded: +" << (data_row_count - expected_frames) << " frames (acceptable due to stop timing)\n";
+            }
+
+            std::cout << "[Realsense] CSV file verification successful\n";
+            return true;
+
+        } catch (const std::exception& e) {
+            std::cout << "[Realsense] CSV file verification failed: " << e.what() << "\n";
+            return false;
+        }
+    }
+
+    bool _verify_bag(const std::string& bag_path) {
         std::cout << "[Realsense] Verifying file: " << bag_path << "\n";
 
         if (!std::filesystem::exists(bag_path)) {

@@ -217,6 +217,7 @@ private:
     std::map<std::string, std::vector<std::string>> _scan() {
         std::map<std::string, std::vector<std::string>> files{
             {"realsense_bags", {}},
+            {"realsense_csvs", {}},
             {"tobii_csvs", {}}
         };
         try {
@@ -225,8 +226,21 @@ private:
                     auto ext = f.path().extension();
                     // Use generic_string() for consistent forward slash paths
                     auto path_str = f.path().generic_string();
-                    if (ext == ".bag") files["realsense_bags"].push_back(path_str);
-                    else if (ext == ".csv") files["tobii_csvs"].push_back(path_str);
+
+                    if (ext == ".bag") {
+                        files["realsense_bags"].push_back(path_str);
+                    }
+                    else if (ext == ".csv") {
+                        // Check if file is in realsense or tobii directory
+                        if (path_str.find("/realsense/") != std::string::npos ||
+                            path_str.find("\\realsense\\") != std::string::npos) {
+                            files["realsense_csvs"].push_back(path_str);
+                        }
+                        else if (path_str.find("/tobii/") != std::string::npos ||
+                                 path_str.find("\\tobii\\") != std::string::npos) {
+                            files["tobii_csvs"].push_back(path_str);
+                        }
+                    }
                 }
             }
         } catch (const std::exception& e) {

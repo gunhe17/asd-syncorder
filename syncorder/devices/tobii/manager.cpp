@@ -129,7 +129,7 @@ public:
 
         int valid_files = 0;
         for (const auto& csv_path : csv_files) {
-            if (_verify(csv_path)) {
+            if (_verify_csv(csv_path)) {
                 valid_files++;
             }
         }
@@ -148,7 +148,7 @@ public:
     }
 
 private:
-    bool _verify(const std::string& csv_path) {
+    bool _verify_csv(const std::string& csv_path) {
         std::cout << "[Tobii] Verifying file: " << csv_path << "\n";
 
         if (!std::filesystem::exists(csv_path)) {
@@ -166,12 +166,16 @@ private:
 
         try {
             std::ifstream file(csv_path);
-            std::string first_line;
-            if (std::getline(file, first_line)) {
-                std::cout << "[Tobii] First line: " << first_line << "\n";
-                if (first_line.find("index,") == 0) {
-                    std::cout << "[Tobii] File verification successful\n";
-                    return true;
+            std::string line;
+            int line_count = 0;
+            bool header_valid = false;
+
+            // Read and verify header
+            if (std::getline(file, line)) {
+                line_count++;
+                std::cout << "[Tobii] First line: " << line << "\n";
+                if (line.find("index,") == 0) {
+                    header_valid = true;
                 } else {
                     std::cout << "[Tobii] Invalid CSV header format\n";
                     return false;
@@ -180,6 +184,32 @@ private:
                 std::cout << "[Tobii] Could not read first line\n";
                 return false;
             }
+
+            // Count data rows (excluding header)
+            while (std::getline(file, line)) {
+                if (!line.empty()) {
+                    line_count++;
+                }
+            }
+
+            int data_row_count = line_count - 1; // Exclude header
+            int expected_frames = gonfig.record_duration * 60; // 60 fps
+
+            std::cout << "[Tobii] Data rows: " << data_row_count << "\n";
+            std::cout << "[Tobii] Expected frames (60fps * " << gonfig.record_duration << "s): " << expected_frames << "\n";
+
+            if (data_row_count < expected_frames) {
+                std::cout << "[Tobii] Insufficient frames (expected: >=" << expected_frames << ", actual: " << data_row_count << ")\n";
+                return false;
+            }
+
+            if (data_row_count > expected_frames) {
+                std::cout << "[Tobii] Extra frames recorded: +" << (data_row_count - expected_frames) << " frames (acceptable due to stop timing)\n";
+            }
+
+            std::cout << "[Tobii] File verification successful\n";
+            return true;
+
         } catch (const std::exception& e) {
             std::cout << "[Tobii] File verification failed: " << e.what() << "\n";
             return false;
