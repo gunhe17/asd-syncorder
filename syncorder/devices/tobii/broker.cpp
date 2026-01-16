@@ -89,47 +89,49 @@ private:
     size_t index_ = 0;
 
 public:
-    TobiiBroker() {
+    TobiiBroker(bool create_output) {
         output_ = gonfig.output_path + "tobii/";
 
-        std::filesystem::create_directories(output_);
+        if (create_output) {
+            std::filesystem::create_directories(output_);
 
-        csv_.open(output_ + "tobii_data.csv");
-        csv_
-            <<"index,"
+            csv_.open(output_ + "tobii_data.csv");
+            csv_
+                <<"index,"
 
-            <<"frame_timestamp,"
-            <<"frame_hardware_timestamp,"
+                <<"frame_timestamp,"
+                <<"frame_hardware_timestamp,"
 
-            <<"left_gaze_display_x,"
-            <<"left_gaze_display_y,"
-            <<"left_gaze_3d_x,"
-            <<"left_gaze_3d_y,"
-            <<"left_gaze_3d_z,"
-            <<"left_gaze_validity,"
+                <<"left_gaze_display_x,"
+                <<"left_gaze_display_y,"
+                <<"left_gaze_3d_x,"
+                <<"left_gaze_3d_y,"
+                <<"left_gaze_3d_z,"
+                <<"left_gaze_validity,"
 
-            <<"left_gaze_origin_x,"
-            <<"left_gaze_origin_y,"
-            <<"left_gaze_origin_z,"
-            <<"left_gaze_origin_validity,"
+                <<"left_gaze_origin_x,"
+                <<"left_gaze_origin_y,"
+                <<"left_gaze_origin_z,"
+                <<"left_gaze_origin_validity,"
 
-            <<"left_pupil_diameter,"
-            <<"left_pupil_validity,"
+                <<"left_pupil_diameter,"
+                <<"left_pupil_validity,"
 
-            <<"right_gaze_display_x,"
-            <<"right_gaze_display_y,"
-            <<"right_gaze_3d_x,"
-            <<"right_gaze_3d_y,"
-            <<"right_gaze_3d_z,"
-            <<"right_gaze_validity,"
+                <<"right_gaze_display_x,"
+                <<"right_gaze_display_y,"
+                <<"right_gaze_3d_x,"
+                <<"right_gaze_3d_y,"
+                <<"right_gaze_3d_z,"
+                <<"right_gaze_validity,"
 
-            <<"right_gaze_origin_x,"
-            <<"right_gaze_origin_y,"
-            <<"right_gaze_origin_z,"
-            <<"right_gaze_origin_validity,"
+                <<"right_gaze_origin_x,"
+                <<"right_gaze_origin_y,"
+                <<"right_gaze_origin_z,"
+                <<"right_gaze_origin_validity,"
 
-            <<"right_pupil_diameter,"
-            <<"right_pupil_validity\n";
+                <<"right_pupil_diameter,"
+                <<"right_pupil_validity\n";
+        }
     }
     ~TobiiBroker() {}
 

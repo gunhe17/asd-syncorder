@@ -41,12 +41,15 @@ private:
     std::mutex frame_mutex_;
 
 public:
-    RealsenseBroker() {
+    RealsenseBroker(bool create_output) {
         output_ = gonfig.output_path + "realsense/";
-        std::filesystem::create_directories(output_);
 
-        csv_.open(output_ + "realsense_data.csv");
-        csv_ << "index,color_timestamp,depth_timestamp,color_frame_number,depth_frame_number\n";
+        if (create_output) {
+            std::filesystem::create_directories(output_);
+            
+            csv_.open(output_ + "realsense_data.csv");
+            csv_ << "index,color_timestamp,depth_timestamp,color_frame_number,depth_frame_number\n";
+        }
     }
 
     ~RealsenseBroker() {}
@@ -80,9 +83,10 @@ protected:
 
 private:
     void _write(const RealsenseBufferData& data) {
+        // Use high precision output for timestamps
         csv_ << index_ << ","
-             << data.color_frame.get_timestamp() << ","
-             << data.depth_frame.get_timestamp() << ","
+             << std::fixed << std::setprecision(14) << data.color_frame.get_timestamp() << ","
+             << std::fixed << std::setprecision(14) << data.depth_frame.get_timestamp() << ","
              << data.color_frame.get_frame_number() << ","
              << data.depth_frame.get_frame_number() << "\n";
         index_++;

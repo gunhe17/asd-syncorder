@@ -53,52 +53,20 @@ int main(int argc, char* argv[]) {
          * ::Initalize
          */
         syncorder.setTimeout(std::chrono::milliseconds(10000));
-        syncorder.addDevice(std::make_unique<RealsenseManager>(0));
-        syncorder.addDevice(std::make_unique<TobiiManager>(0));
-
-        // cpu monitor
-        CpuMonitor cpu_monitor;
-        cpu_monitor.start();
-        
-        /**
-         * ::Setup()
-         */
-        if (!syncorder.executeSetup()) return -1;
+        syncorder.addDevice(std::make_unique<RealsenseManager>(0, false));
+        syncorder.addDevice(std::make_unique<TobiiManager>(0, false));
 
         /**
-         * ::Warmup()
+         * ::Verify()
          */
-        if (!syncorder.executeWarmup()) return -1;
-        std::this_thread::sleep_for(std::chrono::seconds(3));
-
-        /**
-         * ::Stop()
-         */
-        for (int i = gonfig.record_duration; i > 0 && !should_exit; --i) {
-            std::cout << "  " << i << " seconds remaining...\r" << std::flush;
-
-            for (int j = 0; j < 10 && !should_exit; ++j) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                if (stopEvent && WaitForSingleObject(stopEvent, 0) == WAIT_OBJECT_0) {
-                    std::cout << "\n[INFO] External stop signal received via Named Event\n";
-                    should_exit = true;
-                    break;
-                }
-            }
+        std::cout << "[INFO] Starting verify phase...\n";
+        if(!syncorder.executeVerify()) {
+            std::cout << "[ERROR] Verify failed\n";
+            return 1;
         }
+        std::cout << "[INFO] Verify completed successfully\n";
 
-        if (should_exit) {
-            std::cout << "\n[INFO] Early termination requested. Stopping recording...\n";
-        } else {
-            std::cout << "\n[INFO] Recording duration completed. Stopping recording...\n";
-        }
-
-        std::cout << "[INFO] Executing stop sequence...\n";
-        syncorder.executeStop();
-        std::cout << "[INFO] Executing cleanup sequence...\n";
-        syncorder.executeCleanup();
-
-        cpu_monitor.stop();
+        return 0;
 
     } catch (const std::exception& e) {
         std::cout << "[ERROR] Main.cpp error: " << e.what() << "\n";

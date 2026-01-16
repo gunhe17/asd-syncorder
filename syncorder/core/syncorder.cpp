@@ -101,13 +101,27 @@ public:
         std::cout << "[syncorder] Cleanup phase completed\n";
     }
 
-    bool executeVerify() {
-        auto files = _scan();
-        std::cout << "[syncorder] Found " << files["realsense_bags"].size() << " .bag files and " << files["tobii_csvs"].size() << " .csv files\n";
+    bool executeCheck() {
+        std::cout << "[syncorder] Starting check phase for flat structure at: " << gonfig.output_path << "\n";
 
         for (auto& manager : managers_) {
             try{
-                manager->verify(files);
+                manager->check();
+            } catch (const std::exception& e) {
+                std::cout << "[" << manager->__name__() << "] Check error: " << e.what() << "\n";
+            }
+        }
+
+        std::cout << "[syncorder] Check phase completed\n";
+        return true;
+    }
+
+    bool executeVerify() {
+        std::cout << "[syncorder] Starting verify phase for session structure at: " << gonfig.output_path << "\n";
+
+        for (auto& manager : managers_) {
+            try{
+                manager->verify();
             } catch (const std::exception& e) {
                 std::cout << "[" << manager->__name__() << "] Verify error: " << e.what() << "\n";
             }
@@ -212,40 +226,5 @@ private:
         }
         
         return all_success;
-    }
-
-    std::map<std::string, std::vector<std::string>> _scan() {
-        std::map<std::string, std::vector<std::string>> files{
-            {"realsense_bags", {}},
-            {"realsense_csvs", {}},
-            {"tobii_csvs", {}}
-        };
-        try {
-            for (const auto& f : std::filesystem::recursive_directory_iterator(gonfig.output_path)) {
-                if (f.is_regular_file()) {
-                    auto ext = f.path().extension();
-                    // Use generic_string() for consistent forward slash paths
-                    auto path_str = f.path().generic_string();
-
-                    if (ext == ".bag") {
-                        files["realsense_bags"].push_back(path_str);
-                    }
-                    else if (ext == ".csv") {
-                        // Check if file is in realsense or tobii directory
-                        if (path_str.find("/realsense/") != std::string::npos ||
-                            path_str.find("\\realsense\\") != std::string::npos) {
-                            files["realsense_csvs"].push_back(path_str);
-                        }
-                        else if (path_str.find("/tobii/") != std::string::npos ||
-                                 path_str.find("\\tobii\\") != std::string::npos) {
-                            files["tobii_csvs"].push_back(path_str);
-                        }
-                    }
-                }
-            }
-        } catch (const std::exception& e) {
-            std::cout << "[syncorder] Scan error: " << e.what() << "\n";
-        }
-        return files;
     }
 };

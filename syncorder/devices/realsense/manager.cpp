@@ -12,6 +12,8 @@
 #include <syncorder/devices/realsense/callback.cpp>
 #include <syncorder/devices/realsense/buffer.cpp>
 #include <syncorder/devices/realsense/broker.cpp>
+#include <syncorder/devices/realsense/checker.cpp>
+#include <syncorder/devices/realsense/verifier.cpp>
 #include <syncorder/monitoring/realsense_monitor.h>
 
 
@@ -28,19 +30,26 @@ private:
     std::unique_ptr<RealsenseBuffer> buffer_;
     std::unique_ptr<RealsenseBroker> broker_;
 
+    // checker & verifier
+    std::unique_ptr<RealsenseChecker> checker_;
+    std::unique_ptr<RealsenseVerifier> verifier_;
+
     // monitor
     std::thread mt_thread_;
     std::atomic<bool> monitor_in_progress_{false};
     std::unique_ptr<RealsenseMonitor> realsense_monitor_;
 
 public:
-    explicit RealsenseManager(int device_id)
-    : 
+    explicit RealsenseManager(int device_id, bool create_output=true)
+    :
         device_id_(device_id) {
             device_ = std::make_unique<RealsenseDevice>(device_id);
             callback_ = std::make_unique<RealsenseCallback>();
             buffer_ = std::make_unique<RealsenseBuffer>();
-            broker_ = std::make_unique<RealsenseBroker>();
+            broker_ = std::make_unique<RealsenseBroker>(create_output);
+
+            checker_ = std::make_unique<RealsenseChecker>();
+            verifier_ = std::make_unique<RealsenseVerifier>();
 
             realsense_monitor_ = std::make_unique<RealsenseMonitor>();
         }
@@ -143,39 +152,12 @@ public:
         return true;
     }
 
-    bool verify(std::map<std::string, std::vector<std::string>> files) override {
-        auto& csv_files = files["realsense_csvs"];
-        auto& bag_files = files["realsense_bags"];
+    bool check() override {
+        return checker_->check();
+    }
 
-        std::cout << "[Realsense] Starting verification of " << csv_files.size() << " CSV files and " << bag_files.size() << " bag files\n";
-
-        // Verify CSV files
-        int valid_csv_files = 0;
-        for (const auto& csv_path : csv_files) {
-            if (_verify_csv(csv_path)) {
-                valid_csv_files++;
-            }
-        }
-
-        // Verify BAG files
-        int valid_bag_files = 0;
-        for (const auto& bag_path : bag_files) {
-            if (_verify_bag(bag_path)) {
-                valid_bag_files++;
-            }
-        }
-
-        bool csv_result = (valid_csv_files == csv_files.size());
-        bool bag_result = (valid_bag_files == bag_files.size());
-        bool result = csv_result && bag_result;
-
-        _verified(result);
-
-        std::cout << "[Realsense] Summary: " << valid_csv_files << "/" << csv_files.size() << " CSV files valid, "
-                  << valid_bag_files << "/" << bag_files.size() << " bag files valid\n";
-        std::cout << "[Realsense] Verify phase " << (result ? "completed" : "failed") << "\n";
-
-        return result;
+    bool verify() override {
+        return verifier_->verify();
     }
 
     std::string __name__() const override {
@@ -183,161 +165,6 @@ public:
     }
 
 private:
-    bool _verify_csv(const std::string& csv_path) {
-        std::cout << "[Realsense] Verifying CSV file: " << csv_path << "\n";
-
-        if (!std::filesystem::exists(csv_path)) {
-            std::cout << "[Realsense] File does not exist\n";
-            return false;
-        }
-
-        auto file_size = std::filesystem::file_size(csv_path);
-        std::cout << "[Realsense] File size: " << file_size << " bytes\n";
-
-        if (file_size == 0) {
-            std::cout << "[Realsense] File is empty\n";
-            return false;
-        }
-
-        try {
-            std::ifstream file(csv_path);
-            std::string line;
-            int line_count = 0;
-            bool header_valid = false;
-
-            // Read and verify header
-            if (std::getline(file, line)) {
-                line_count++;
-                std::cout << "[Realsense] First line: " << line << "\n";
-                if (line.find("index,") == 0) {
-                    header_valid = true;
-                } else {
-                    std::cout << "[Realsense] Invalid CSV header format\n";
-                    return false;
-                }
-            } else {
-                std::cout << "[Realsense] Could not read first line\n";
-                return false;
-            }
-
-            // Count data rows (excluding header)
-            while (std::getline(file, line)) {
-                if (!line.empty()) {
-                    line_count++;
-                }
-            }
-
-            int data_row_count = line_count - 1; // Exclude header
-            int expected_frames = gonfig.record_duration * 60; // 60 fps
-
-            std::cout << "[Realsense] Data rows: " << data_row_count << "\n";
-            std::cout << "[Realsense] Expected frames (60fps * " << gonfig.record_duration << "s): " << expected_frames << "\n";
-
-            if (data_row_count < expected_frames) {
-                std::cout << "[Realsense] Insufficient frames (expected: >=" << expected_frames << ", actual: " << data_row_count << ")\n";
-                return false;
-            }
-
-            if (data_row_count > expected_frames) {
-                std::cout << "[Realsense] Extra frames recorded: +" << (data_row_count - expected_frames) << " frames (acceptable due to stop timing)\n";
-            }
-
-            std::cout << "[Realsense] CSV file verification successful\n";
-            return true;
-
-        } catch (const std::exception& e) {
-            std::cout << "[Realsense] CSV file verification failed: " << e.what() << "\n";
-            return false;
-        }
-    }
-
-    bool _verify_bag(const std::string& bag_path) {
-        std::cout << "[Realsense] Verifying file: " << bag_path << "\n";
-
-        if (!std::filesystem::exists(bag_path)) {
-            std::cout << "[Realsense] File does not exist\n";
-            return false;
-        }
-
-        // 1) 파일 크기 점검
-        auto size_now = std::filesystem::file_size(bag_path);
-        if (size_now == 0) {
-            std::cout << "[Realsense] File size is 0 bytes\n";
-            return false;
-        }
-
-        // 2) 파일 크기 안정화 대기 (쓰기/이동 중 방지)
-        using namespace std::chrono_literals;
-        {
-            bool stable = false;
-            for (int i = 0; i < 10; ++i) { // 최대 ~1s
-                std::this_thread::sleep_for(100ms);
-                auto size_next = std::filesystem::file_size(bag_path);
-                if (size_next == size_now) { stable = true; break; }
-                size_now = size_next;
-            }
-            if (!stable) {
-                std::cout << "[Realsense] File size is still changing (likely being written)\n";
-                return false;
-            }
-        }
-
-        // 3) 임시 파일로 복사 후 검증
-        std::string temp_verify_path = bag_path + ".verify.bag";
-        bool verify_result = false;
-
-        try {
-            // 파일 복사
-            std::filesystem::copy_file(bag_path, temp_verify_path,
-                std::filesystem::copy_options::overwrite_existing);
-
-            // 복사 완료 대기
-            std::this_thread::sleep_for(200ms);
-
-            // 4) 복사된 파일로 RealSense 파이프라인 검증
-            rs2::config cfg;
-            rs2::pipeline pipe;
-
-            cfg.enable_device_from_file(temp_verify_path, /*repeat_playback=*/false);
-            auto profile = pipe.start(cfg);     // 여기서 rosbag reader 생성/검증
-            pipe.stop();                         // 핸들 즉시 반환
-
-            verify_result = true;
-        }
-        catch (const rs2::error& e) {
-            std::cout << "[Realsense] RS2 error: " << e.what()
-                    << " (func=" << e.get_failed_function()
-                    << ", args=" << e.get_failed_args() << ")\n";
-            verify_result = false;
-        }
-        catch (const std::filesystem::filesystem_error& e) {
-            std::cout << "[Realsense] File copy error: " << e.what() << "\n";
-            verify_result = false;
-        }
-
-        return verify_result;
-    }
-
-    void _verified(bool result) {
-        if (!std::filesystem::exists(gonfig.verified_path)) {
-            std::filesystem::create_directories(gonfig.verified_path);
-        }
-
-        std::string csv_path = gonfig.verified_path + "realsense_verify_result.csv";
-        std::ofstream csv(csv_path);
-
-        if (!csv.is_open()) {
-            std::cout << "[Realsense] Failed to create result CSV file: " << csv_path << "\n";
-            return;
-        }
-
-        csv << "valid\n";
-        csv << result;
-
-        csv.close();
-        std::cout << "[Realsense] Results written to " << csv_path << "\n";
-    }
-
     void _monitor() {
         mt_thread_ = std::thread([this]() {
             while (monitor_in_progress_.load()) {

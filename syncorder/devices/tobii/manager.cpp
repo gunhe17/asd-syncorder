@@ -12,6 +12,8 @@
 #include <syncorder/devices/tobii/callback.cpp>
 #include <syncorder/devices/tobii/buffer.cpp>
 #include <syncorder/devices/tobii/broker.cpp>
+#include <syncorder/devices/tobii/checker.cpp>
+#include <syncorder/devices/tobii/verifier.cpp>
 
 
 /**
@@ -27,6 +29,10 @@ private:
     std::unique_ptr<TobiiBuffer> buffer_;
     std::unique_ptr<TobiiBroker> broker_;
 
+    // checker & verifier
+    std::unique_ptr<TobiiChecker> checker_;
+    std::unique_ptr<TobiiVerifier> verifier_;
+
     // converter
     std::unique_ptr<TSConverter> converter_;
 
@@ -39,13 +45,16 @@ private:
     std::atomic<bool> monitor_in_progress_{false};
 
 public:
-    explicit TobiiManager(int device_id)
-    : 
+    explicit TobiiManager(int device_id, bool create_output=true)
+    :
         device_id_(device_id) {
             device_ = std::make_unique<TobiiDevice>(device_id);
             callback_ = std::make_unique<TobiiCallback>();
             buffer_ = std::make_unique<TobiiBuffer>();
-            broker_ = std::make_unique<TobiiBroker>();
+            broker_ = std::make_unique<TobiiBroker>(create_output);
+
+            checker_ = std::make_unique<TobiiChecker>();
+            verifier_ = std::make_unique<TobiiVerifier>();
 
             converter_ = std::make_unique<TSConverter>();
         }
@@ -123,24 +132,12 @@ public:
         return true;
     }
 
-    bool verify(std::map<std::string, std::vector<std::string>> files) override {
-        auto& csv_files = files["tobii_csvs"];
-        std::cout << "[Tobii] Starting verification of " << csv_files.size() << " CSV files\n";
+    bool check() override {
+        return checker_->check();
+    }
 
-        int valid_files = 0;
-        for (const auto& csv_path : csv_files) {
-            if (_verify_csv(csv_path)) {
-                valid_files++;
-            }
-        }
-
-        bool result = (valid_files == csv_files.size());
-        _verified(result);
-
-        std::cout << "[Tobii] Summary: " << valid_files << "/" << csv_files.size() << " files valid\n";
-        std::cout << "[Tobii] Verify phase " << (result ? "completed" : "failed") << "\n";
-
-        return result;
+    bool verify() override {
+        return verifier_->verify();
     }
 
     std::string __name__() const override {
@@ -148,94 +145,6 @@ public:
     }
 
 private:
-    bool _verify_csv(const std::string& csv_path) {
-        std::cout << "[Tobii] Verifying file: " << csv_path << "\n";
-
-        if (!std::filesystem::exists(csv_path)) {
-            std::cout << "[Tobii] File does not exist\n";
-            return false;
-        }
-
-        auto file_size = std::filesystem::file_size(csv_path);
-        std::cout << "[Tobii] File size: " << file_size << " bytes\n";
-
-        if (file_size == 0) {
-            std::cout << "[Tobii] File is empty\n";
-            return false;
-        }
-
-        try {
-            std::ifstream file(csv_path);
-            std::string line;
-            int line_count = 0;
-            bool header_valid = false;
-
-            // Read and verify header
-            if (std::getline(file, line)) {
-                line_count++;
-                std::cout << "[Tobii] First line: " << line << "\n";
-                if (line.find("index,") == 0) {
-                    header_valid = true;
-                } else {
-                    std::cout << "[Tobii] Invalid CSV header format\n";
-                    return false;
-                }
-            } else {
-                std::cout << "[Tobii] Could not read first line\n";
-                return false;
-            }
-
-            // Count data rows (excluding header)
-            while (std::getline(file, line)) {
-                if (!line.empty()) {
-                    line_count++;
-                }
-            }
-
-            int data_row_count = line_count - 1; // Exclude header
-            int expected_frames = gonfig.record_duration * 60; // 60 fps
-
-            std::cout << "[Tobii] Data rows: " << data_row_count << "\n";
-            std::cout << "[Tobii] Expected frames (60fps * " << gonfig.record_duration << "s): " << expected_frames << "\n";
-
-            if (data_row_count < expected_frames) {
-                std::cout << "[Tobii] Insufficient frames (expected: >=" << expected_frames << ", actual: " << data_row_count << ")\n";
-                return false;
-            }
-
-            if (data_row_count > expected_frames) {
-                std::cout << "[Tobii] Extra frames recorded: +" << (data_row_count - expected_frames) << " frames (acceptable due to stop timing)\n";
-            }
-
-            std::cout << "[Tobii] File verification successful\n";
-            return true;
-
-        } catch (const std::exception& e) {
-            std::cout << "[Tobii] File verification failed: " << e.what() << "\n";
-            return false;
-        }
-    }
-
-    void _verified(bool result) {
-        if (!std::filesystem::exists(gonfig.verified_path)) {
-            std::filesystem::create_directories(gonfig.verified_path);
-        }
-
-        std::string csv_path = gonfig.verified_path + "tobii_verify_result.csv";
-        std::ofstream csv(csv_path);
-
-        if (!csv.is_open()) {
-            std::cout << "[Tobii] Failed to create result CSV file: " << csv_path << "\n";
-            return;
-        }
-
-        csv << "valid\n";
-        csv << result;
-
-        csv.close();
-        std::cout << "[Tobii] Results written to " << csv_path << "\n";
-    }
-
     void _calibrate() {
         cb_thread_ = std::thread([this]() {
             while (calibrate_in_progress_.load()) {

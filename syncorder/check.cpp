@@ -107,14 +107,14 @@ int main(int argc, char* argv[]) {
         syncorder.executeCleanup();
 
         /**
-         * ::Verify()
+         * ::Check()
          */
-        std::cout << "[INFO] Starting verify phase...\n";
-        if(!syncorder.executeVerify()) {
-            std::cout << "[ERROR] Verify failed\n";
+        std::cout << "[INFO] Starting check phase...\n";
+        if(!syncorder.executeCheck()) {
+            std::cout << "[ERROR] Check failed\n";
             return 1;
         }
-        std::cout << "[INFO] Verify completed successfully\n";
+        std::cout << "[INFO] Check completed successfully\n";
         
         return 0;
 
